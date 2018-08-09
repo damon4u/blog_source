@@ -14,7 +14,7 @@ categories: maven
 * dependencyManagement：直接管理项目中依赖的版本，直接依赖或者间接依赖。
 * scope：这个字段允许指定依赖的作用范围。
 * exclusions：如果项目x依赖项目y，项目y依赖项目z，那么项目x的拥有者可以显示的排除项目z。
-* optional：如果项目y依赖项目z，项目y可以将对z的引用标识为optional，这样，当项目x引用项目y时，项目x就不会引入项目z。可以将optional理解为默认excluded。
+* optional：如果项目y依赖项目z，项目y可以将对z的引用标识为optional，这样，当项目x引用项目y时，项目x就不会引入项目z。__可以将optional理解为默认excluded。__
 
 ### 2.Dependency Scope（依赖作用域）
 
@@ -69,4 +69,4 @@ scope为test表示依赖项目仅仅参与测试相关的工作，包括测试�
 ```
 
 #### 2.5 system
-从参与度来说，也provided相同，不过被依赖项不会从maven仓库抓，而是从本地文件系统拿，一定需要配合systemPath属性使用。
+从参与度来说，也provided相同，不过被依赖项不会从maven仓库抓，而是从本地文件系统拿，一定需要配合`systemPath`属性使用。
