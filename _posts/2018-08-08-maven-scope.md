@@ -7,6 +7,8 @@ categories: maven
 
 参考Maven Doc [Introduction to the Dependency Mechanism](https://maven.apache.org/guides/introduction/introduction-to-dependency-mechanism.html)
 
+<!-- more -->
+
 ### 1.Transitive Dependencies（依赖传递性）
 依赖传递这种特性可以帮助我们自动引入依赖包所需要的类，递归的。
 
