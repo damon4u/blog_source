@@ -1,5 +1,5 @@
 ---
-title: classpath: 与 classpath*:
+title: classpath与classpath*
 date: 2018-08-22 16:41:50
 tags: spring
 categories: spring
