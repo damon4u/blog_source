@@ -26,6 +26,8 @@ bigDecimalFromString=6302079.05
 可以看到，直接使用double作为参数构造BigDecimal时，会丢失精度。
 所以推荐的是先将double转化为字符串，然后赋值给构造函数。
 
+<!--  more -->
+
 ### 2. 数值计算丢失精度
 ```java
 public void testDecimalCompute() {
