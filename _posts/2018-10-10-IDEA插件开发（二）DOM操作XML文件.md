@@ -94,5 +94,5 @@ static <T extends DomElement> Collection<T> findDomElements(@NotNull Project pro
 }
 ```
 
-参考资料
-[官方文档XML DOM API](https://www.jetbrains.org/intellij/sdk/docs/reference_guide/frameworks_and_external_apis/xml_dom_api.html)
+参考资料：
+[XML DOM API](https://www.jetbrains.org/intellij/sdk/docs/reference_guide/frameworks_and_external_apis/xml_dom_api.html)
