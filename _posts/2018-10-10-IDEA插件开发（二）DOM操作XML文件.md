@@ -41,6 +41,8 @@ if (document != null) {
 ```
 这样的写法看起来很臃肿，有一种更好的方案是使用DOM。
 
+<!-- more -->
+
 ### 使用DOM操作XML
 用 __Document Object Model__ (DOM) 来改写上面的写法。
 首先需要继承`DomElement`，为每一个xml元素创建接口：
