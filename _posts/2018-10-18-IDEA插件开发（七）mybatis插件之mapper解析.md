@@ -251,6 +251,7 @@ public interface Where extends DynamicQueryableDomElement {
 
 }
 ```
+其他子标签与`Where`类似，不多写。
 其中`Include`标签要特殊一些，根据mybatis的规则，该标签用来引用sql代码片段。
 所谓sql代码片段，是一段可复用的动态查询语句集合，因此我们先定义`Sql`实体：
 ```java
@@ -272,3 +273,192 @@ public interface Include extends DomElement {
 }
 ```
 注意返回值泛型参数为`Sql`实体，这样在xml编写时，IDEA可以自动提供代码补全、鼠标点击跳转引用等功能。
+
+### 带有请求参数的元素
+增删改查元素都可以配置请求参数，包含`parameterType`指定一个实体类，那么我们抽取一个元素：
+```java
+public interface ParameteredDynamicQueryableDomElement extends DynamicQueryableDomElement, IdDomElement {
+
+    @NotNull
+    @Attribute("parameterType")
+    // TODO: converter
+    GenericAttributeValue<PsiClass> getParameterType();
+}
+```
+其中`parameterType`的返回值泛型类型为`PsiClass`，这样能映射到一个具体的实体类上。
+
+### 增删改查标签
+有了`ParameteredDynamicQueryableDomElement`，就可以在此基础上继续丰富，定义增删改查标签。
+
+#### Insert
+```java
+public interface Insert extends ParameteredDynamicQueryableDomElement {
+
+    @SubTagList("selectKey")
+    List<SelectKey> getSelectKey();
+}
+
+/**
+ * Description:
+ * 插入语句中的selectkey标签，用来生成主键
+ *
+ * @author damon4u
+ * @version 2018-10-18 17:32
+ */
+public interface SelectKey extends DomElement {
+
+    @NotNull
+    @Attribute("resultType")
+    // TODO: converter
+    GenericAttributeValue<PsiClass> getResultType();
+}
+```
+
+#### Delete
+```java
+public interface Delete extends ParameteredDynamicQueryableDomElement {
+
+}
+```
+
+#### Update
+```java
+public interface Update extends ParameteredDynamicQueryableDomElement {
+
+}
+```
+
+#### Select
+```java
+public interface Select extends ParameteredDynamicQueryableDomElement, ResultMapAttributeDomElement {
+
+    @NotNull
+    @Attribute("resultType")
+    // TODO: converter
+    GenericAttributeValue<PsiClass> getResultType();
+}
+```
+其中返回`resultType`好理解，指定一个实体类，而mybatis规定select标签是可以返回`resultMap`的。
+这里提现在`ResultMapAttributeDomElement`：
+```java
+public interface ResultMapAttributeDomElement extends DomElement {
+
+    @NotNull
+    @Attribute("resultMap")
+    // TODO: converter
+    GenericAttributeValue<ResultMap> getResultMap();
+}
+```
+接下来重点介绍这个相对复杂的`resultMap`。
+
+#### resultMap
+
+`resultMap`元素有很多子元素和一个值得讨论的结构。
+resultMap
+* `constructor` - 用于在实例化类时，注入结果到构造方法中
+  * `idArg` - ID 参数;标记出作为 ID 的结果可以帮助提高整体性能
+  * `arg` - 将被注入到构造方法的一个普通结果
+* `id` – 一个 ID 结果;标记出作为 ID 的结果可以帮助提高整体性能
+* `result` – 注入到字段或`JavaBean`属性的普通结果
+* `association` – 一个复杂类型的关联;许多结果将包装成这种类型
+  * 嵌套结果映射 – associations are resultMaps themselves, or can refer to one
+* `collection` – 一个复杂类型的集合
+  * 嵌套结果映射 – collections are resultMaps themselves, or can refer to one
+* `discriminator` – 使用结果值来决定使用哪个`resultMap`
+  * `case` – 基于某些值的结果映射
+    * 嵌套结果映射 – 一个 case 也是一个映射它本身的结果,因此可以包含很多相 同的元素，或者它可以参照一个外部的 resultMap。
+
+首先，将`resultMap`中的基础元素抽取出来，他们可能直接出现在`resultMap`标签中，也可能出现在`association`等子标签中：
+```java
+/**
+ * Description:
+ * mapper中的resultMap标签内元素基本属性
+ *
+ * @author damon4u
+ * @version 2018-10-18 17:47
+ */
+public interface ResultMapBaseDomElement extends DomElement {
+
+    @SubTag("constructor")
+    Constructor getConstructor();
+
+    @SubTagList("id")
+    List<Id> getIds();
+
+    @SubTagList("result")
+    List<Result> getResults();
+
+    @SubTagList("association")
+    List<Association> getAssociations();
+
+    @SubTagList("collection")
+    List<Collection> getCollections();
+
+    @SubTag("discriminator")
+    Discriminator getDiscriminator();
+
+}
+```
+其中`id`和`result`子标签功能类似，用来做数据库字段与实体字段映射，包含`property`属性，那么我们将`property`属性抽取出来：
+```java
+/**
+ * Description:
+ * 包含property属性的元素
+ *
+ * @author damon4u
+ * @version 2018-10-18 17:52
+ */
+public interface PropertyAttributeDomElement extends DomElement {
+
+    @Attribute("property")
+    @Convert(PropertyConverter.class)
+    GenericAttributeValue<XmlAttributeValue> getProperty();
+}
+```
+然后让`id`和`result`去继承它：
+```java
+public interface Id extends PropertyAttributeDomElement {
+
+}
+
+public interface Result extends PropertyAttributeDomElement {
+
+}
+```
+而`association`和`collection`子标签功能会多一些，内部还可能包含一个嵌套的`resultMap`，因此会继承多一些，当然，它们会包含自己独有的属性：
+```java
+public interface Association extends ResultMapBaseDomElement, ResultMapAttributeDomElement, PropertyAttributeDomElement {
+
+    @NotNull
+    @Attribute("javaType")
+    // TODO: converter
+    GenericAttributeValue<PsiClass> getJavaType();
+}
+
+public interface Collection extends ResultMapBaseDomElement, ResultMapAttributeDomElement, PropertyAttributeDomElement {
+
+    @NotNull
+    @Attribute("ofType")
+    // TODO: converter
+    GenericAttributeValue<PsiClass> getOfType();
+}
+```
+
+### 属性转换器PropertyConverter
+重新把`property`属性请回来，因为我们要讲它的转换器：
+```java
+/**
+ * Description:
+ * 包含property属性的元素
+ *
+ * @author damon4u
+ * @version 2018-10-18 17:52
+ */
+public interface PropertyAttributeDomElement extends DomElement {
+
+    @Attribute("property")
+    @Convert(PropertyConverter.class)
+    GenericAttributeValue<XmlAttributeValue> getProperty();
+}
+```
+首先说目的，加这个转换器，是为了让`resultMap`中的`property`属性具有鼠标点击跳转操作，即为属性值创建引用到实体上。
