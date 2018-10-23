@@ -462,3 +462,389 @@ public interface PropertyAttributeDomElement extends DomElement {
 }
 ```
 首先说目的，加这个转换器，是为了让`resultMap`中的`property`属性具有鼠标点击跳转操作，即为属性值创建引用到实体上。
+假如我们有这样一个`User`实体：
+```java
+public class User {
+
+    private Long id;
+
+    private String userName;
+
+    private Integer age;
+
+    private User son;
+
+}
+```
+我们可能会有如下`resultMap`：
+```xml
+<resultMap id="userResultMap" type="com.damon4u.demo.domain.User">
+    <id column="id" property="id"/>
+    <result column="user_name" property="userName"/>
+    <result column="age" property="age"/>
+    <result column="son_id" property="son.id"/>
+</resultMap>
+```
+按照mybatis规定，除了可以映射基本类型和简单类型，还可以映射带引用嵌套层级的属性，如`son.id`。
+
+首先创建个`MapperUtils`，写一个方法，用来获取当前`property`所属标签对应哪个实体类：
+```java
+public final class MapperUtils {
+
+    private MapperUtils() {
+        throw new UnsupportedOperationException();
+    }
+
+    /**
+     * 获取property从属的类型
+     *
+     * @param attributeValue property属性
+     * @return
+     */
+    public static Optional<PsiClass> getPropertyClazz(XmlAttributeValue attributeValue) {
+        DomElement domElement = DomUtil.getDomElement(attributeValue);
+        if (null == domElement) {
+            return Optional.empty();
+        }
+        // collection标签下的property，那么类型为ofType指定
+        Collection collection = DomUtil.getParentOfType(domElement, Collection.class, true);
+        if (null != collection && isNotWithinSameTag(collection, attributeValue)) {
+            return Optional.ofNullable(collection.getOfType().getValue());
+        }
+        // association标签下的property，那么类型为javaType指定
+        Association association = DomUtil.getParentOfType(domElement, Association.class, true);
+        if (null != association && isNotWithinSameTag(association, attributeValue)) {
+            return Optional.ofNullable(association.getJavaType().getValue());
+        }
+        // resultMap标签下的property，那么类型为type指定
+        ResultMap resultMap = DomUtil.getParentOfType(domElement, ResultMap.class, true);
+        if (null != resultMap && isNotWithinSameTag(resultMap, attributeValue)) {
+            return Optional.ofNullable(resultMap.getType().getValue());
+        }
+        return Optional.empty();
+
+    }
+
+    private static boolean isNotWithinSameTag(@NotNull DomElement domElement, @NotNull XmlElement xmlElement) {
+        XmlTag xmlTag = PsiTreeUtil.getParentOfType(xmlElement, XmlTag.class);
+        return !domElement.getXmlTag().equals(xmlTag);
+    }
+}
+```
+
+接下来还需要一个工具类`JavaUtils`，用来从类中寻找成员变量（非static、非final）的：
+```java
+public final class JavaUtils {
+
+    private JavaUtils() {
+        throw new UnsupportedOperationException();
+    }
+
+    /**
+     * 从类中查找成员变量
+     *
+     * @param clazz        类
+     * @param propertyName 属性名称
+     * @return
+     */
+    @NotNull
+    public static Optional<PsiField> findSettablePsiField(@NotNull final PsiClass clazz,
+                                                          @Nullable final String propertyName) {
+        final PsiField field = PropertyUtil.findPropertyField(clazz, propertyName, false);
+        return Optional.ofNullable(field);
+    }
+
+    /**
+     * 获取类中所有成员变量
+     *
+     * @param clazz 类
+     * @return
+     */
+    @NotNull
+    public static PsiField[] findSettablePsiFields(final @NotNull PsiClass clazz) {
+        final PsiField[] allFields = clazz.getAllFields();
+        final List<PsiField> settableFields = new ArrayList<>(allFields.length);
+        for (final PsiField field : allFields) {
+            final PsiModifierList modifierList = field.getModifierList();
+            if (modifierList != null &&
+                    (modifierList.hasModifierProperty(PsiModifier.STATIC)
+                            || modifierList.hasModifierProperty(PsiModifier.FINAL))) {
+                continue;
+            }
+            settableFields.add(field);
+        }
+        return settableFields.toArray(new PsiField[0]);
+    }
+}
+```
+
+有了工具类，就可以写解析器了，将xml属性解析到实体类字段：
+```java
+/**
+ * Description:
+ * <p>
+ * 将xml属性解析到实体类字段
+ *
+ * @author damon4u
+ * @version 2018-10-19 11:46
+ */
+class PsiFiledReferenceSetResolver {
+
+    /**
+     * 嵌套引用分隔符
+     */
+    private static final Splitter SPLITTER = Splitter.on(String.valueOf(ReferenceSetBase.DOT_SEPARATOR));
+
+    /**
+     * 当前属性元素
+     */
+    private XmlAttributeValue element;
+
+    /**
+     * 属性全名可能包含引用，例如user.name，那么按照点号分割，保存所有字段名称
+     */
+    private List<String> fieldNameWithReferenceList;
+
+    PsiFiledReferenceSetResolver(@NotNull XmlAttributeValue element) {
+        this.element = element;
+        // 属性全名，可能包含引用，如user.name
+        String wholeFiledName = element.getValue() != null ? element.getValue() : "";
+        this.fieldNameWithReferenceList = Lists.newArrayList(SPLITTER.split(wholeFiledName));
+    }
+
+    /**
+     * 将xml属性解析到实体类字段
+     *
+     * @param index 按照点号分割后，属性位于哪一级，index为索引值
+     *              例如user.name，那么idea会为user和name分别创建引用，都可以鼠标点击跳转
+     *              user的index为0，name的index为1
+     *              这个值决定解析层级深度
+     */
+    final Optional<? extends PsiElement> resolve(int index) {
+        // 先获取一级属性
+        // 对于简单属性"name"，那么就是这个属性
+        // 对于包含引用的情况"user.name"，那么先找到一级属性user
+        Optional<PsiField> firstLevelElement = getFirstLevelElement(Iterables.getFirst(fieldNameWithReferenceList, null));
+        return firstLevelElement.isPresent() ?
+                (fieldNameWithReferenceList.size() > 1 ? parseNextLevelElement(firstLevelElement, index) : firstLevelElement)
+                : Optional.empty();
+    }
+
+    /**
+     * 获取一级属性
+     * 对于简单属性"name"，那么就是这个属性
+     * 对于包含引用的情况"user.name"，那么先找到一级属性user
+     *
+     * @param firstLevelFieldName 第一层级的属性名，可能是一个引用，也可能是基本类型
+     * @return
+     */
+    @NotNull
+    private Optional<PsiField> getFirstLevelElement(@Nullable String firstLevelFieldName) {
+        Optional<PsiClass> clazz = MapperUtils.getPropertyClazz(element);
+        return clazz.flatMap(psiClass -> JavaUtils.findSettablePsiField(psiClass, firstLevelFieldName));
+    }
+
+    /**
+     * 按照点号逐层解析，前面层级为引用，去引用中解析下一层字段
+     *
+     * @param maxLevelIndex 最大解析层级深度，比如"user.name"，那么如果是要为user建立引用，maxLevelIndex为1；
+     *                      如果要为name建立引用，那么maxLevelIndex为2
+     */
+    private Optional<PsiField> parseNextLevelElement(Optional<PsiField> current, int maxLevelIndex) {
+        int index = 1;
+        while (current.isPresent() && index <= maxLevelIndex) {
+            String nextLevelIndexFiledName = fieldNameWithReferenceList.get(index);
+            if (nextLevelIndexFiledName.contains(" ")) {
+                return Optional.empty();
+            }
+            current = resolveReferenceField(current.get(), nextLevelIndexFiledName);
+            index++;
+        }
+        return current;
+    }
+
+    /**
+     * 从引用类型中解析字段
+     * 例如user.name
+     * 那么current为前面解析出来的user引用，fieldName为name
+     *
+     * @param current   当前引用
+     * @param fieldName 要从引用中解析的字段名称
+     * @return 字段
+     */
+    @NotNull
+    private Optional<PsiField> resolveReferenceField(@NotNull PsiField current, @NotNull String fieldName) {
+        PsiType type = current.getType();
+        // 引用类型，而且不包含可变参数
+        if (type instanceof PsiClassReferenceType && !((PsiClassReferenceType) type).hasParameters()) {
+            PsiClass clazz = ((PsiClassReferenceType) type).resolve();
+            if (null != clazz) {
+                return JavaUtils.findSettablePsiField(clazz, fieldName);
+            }
+        }
+        return Optional.empty();
+    }
+}
+```
+外部调用`resolve`方法，首先对一级属性进行解析，如果包含了嵌套引用，那么需要逐层解析。
+
+有了解析器，就可以创建一个`PsiReference`引用，顾名思义，就是创建一个Psi元素的引用：
+```java
+public class ContextPsiFieldReference extends PsiReferenceBase<XmlAttributeValue> {
+
+    private PsiFiledReferenceSetResolver resolver;
+
+    /**
+     * 当前解析层级
+     * 例如property为"user.name"
+     * 那么如果鼠标点击的user，index为1
+     * 如果鼠标点击的是name，index为2
+     */
+    private int index;
+
+    /**
+     * @param element 当前元素
+     * @param range   元素边界
+     * @param index   引用层级
+     */
+    ContextPsiFieldReference(XmlAttributeValue element, TextRange range, int index) {
+        super(element, range, false);
+        this.index = index;
+        resolver = new PsiFiledReferenceSetResolver(element);
+    }
+
+    /**
+     * 解析xml属性，返回对应的引用变量
+     */
+    @SuppressWarnings("unchecked")
+    @Nullable
+    @Override
+    public PsiElement resolve() {
+        Optional<PsiElement> resolved = (Optional<PsiElement>) resolver.resolve(index);
+        return resolved.orElse(null);
+    }
+
+    /**
+     * 代码自动提示类型中所有可赋值（非static和非final）的成员变量列表
+     *
+     * @return 类型中所有可赋值（非static和非final）的成员变量列表
+     */
+    @NotNull
+    @Override
+    public Object[] getVariants() {
+        Optional<PsiClass> clazz = getTargetClazz();
+        return clazz.isPresent() ? JavaUtils.findSettablePsiFields(clazz.get()) : PsiReference.EMPTY_ARRAY;
+    }
+
+    /**
+     * 获取property参数的类型
+     * 如果是简单的"name"，那么就使用外层标签指定的类型
+     * 如果是带引用的"user.name"，那么需要深入解析出具体引用类型user
+     *
+     * @return property参数的类型
+     */
+    @SuppressWarnings("unchecked")
+    private Optional<PsiClass> getTargetClazz() {
+        String elementValue = getElement().getValue();
+        if (elementValue == null) {
+            return Optional.empty();
+        }
+        if (elementValue.contains(String.valueOf(ReferenceSetBase.DOT_SEPARATOR))) {
+            // 包含点号，说明此参数的类型为引用类型
+            // 例如一个类的成员变量中包含其他引用类型
+            int ind = 0 == index ? 0 : index - 1;
+            Optional<PsiElement> resolved = (Optional<PsiElement>) resolver.resolve(ind);
+            if (resolved.isPresent()) {
+                return JavaService.getInstance(myElement.getProject()).getReferenceClazzOfPsiField(resolved.get());
+            }
+        } else { // 没有点号，说明参数类型不是引用类型，直接就是外层标签定义的类型（如resultMap中type指定的类型）中包含的简单类型，如基本类型或者字符串类型变量
+            return MapperUtils.getPropertyClazz(myElement);
+        }
+        return Optional.empty();
+    }
+
+}
+```
+上面创建的`ContextPsiFieldReference`引用需要传入`index`变量，用来指出引用的层级。
+例如xml中属性值为`user.name`，那么如果是`user`这一层的引用，`index`为1，如果是`name`这一层的引用，`index`为2。
+
+接下来创建一个`ReferenceSetBase`，用来解析嵌套引用。
+继承`ReferenceSetBase`并重写`createReference`方法，使用我们上面创建的`ContextPsiFieldReference`。基类`ReferenceSetBase`中包含着对嵌套引用的解析操作：
+```java
+public class ResultPropertyReferenceSet extends ReferenceSetBase<PsiReference> {
+
+    public ResultPropertyReferenceSet(String text, @NotNull PsiElement element, int offset) {
+        super(text, element, offset, ReferenceSetBase.DOT_SEPARATOR);
+    }
+
+    @Override
+    protected PsiReference createReference(TextRange range, int index) {
+        XmlAttributeValue element = (XmlAttributeValue) getElement();
+        return null == element ? null : new ContextPsiFieldReference(element, range, index);
+    }
+}
+```
+有了引用，接下来需要放到转换器中，与字段绑定：
+```java
+public class PropertyConverter extends ResolvingConverter<XmlAttributeValue> implements CustomReferenceConverter<XmlAttributeValue> {
+
+    /**
+     * converter实现CustomReferenceConverter，这样能通过实现createReferences创建引用关系
+     * @param value
+     * @param element
+     * @param context
+     * @return
+     */
+    @NotNull
+    @Override
+    public PsiReference[] createReferences(GenericDomValue<XmlAttributeValue> value, PsiElement element, ConvertContext context) {
+        String stringValue = value.getStringValue();
+        if (stringValue == null) {
+            return PsiReference.EMPTY_ARRAY;
+        }
+        return new ResultPropertyReferenceSet(stringValue, element, ElementManipulators.getOffsetInElement(element)).getPsiReferences();
+    }
+
+    @NotNull
+    @Override
+    public Collection<? extends XmlAttributeValue> getVariants(ConvertContext context) {
+        return Collections.emptyList();
+    }
+
+    @Nullable
+    @Override
+    public XmlAttributeValue fromString(@Nullable String s, ConvertContext context) {
+        DomElement ctxElement = context.getInvocationElement();
+        return ctxElement instanceof GenericAttributeValue ? ((GenericAttributeValue) ctxElement).getXmlAttributeValue() : null;
+    }
+
+    @Nullable
+    @Override
+    public String toString(@Nullable XmlAttributeValue attributeValue, ConvertContext context) {
+        return null;
+    }
+
+}
+```
+最后再看一次使用方式：
+```java
+/**
+ * Description:
+ * 包含property属性的元素
+ *
+ * @author damon4u
+ * @version 2018-10-18 17:52
+ */
+public interface PropertyAttributeDomElement extends DomElement {
+
+    @Attribute("property")
+    @Convert(PropertyConverter.class)
+    GenericAttributeValue<XmlAttributeValue> getProperty();
+}
+```
+这样，再DOM解析时，会使用该converter，而converter实现了`CustomReferenceConverter`，可以创建引用，就能实现引用绑定了。
+
+参考：
+[PSI References](https://www.jetbrains.org/intellij/sdk/docs/basics/architectural_overview/psi_references.html)
+[References and Resolve](https://www.jetbrains.org/intellij/sdk/docs/reference_guide/custom_language_support/references_and_resolve.html)
+[Reference Contributor](https://www.jetbrains.org/intellij/sdk/docs/tutorials/custom_language_support/reference_contributor.html)
