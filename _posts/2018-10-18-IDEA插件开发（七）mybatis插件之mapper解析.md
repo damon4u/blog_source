@@ -174,7 +174,7 @@ GenericAttributeValue<String> getNamespace();
 
 下面开始写单个实体，对mapper中的子元素进行解析。
 
-### 一个包含id属性的基础标签
+#### 一个包含id属性的基础标签
 很多标签都包含`id`属性，例如`resultMap`，`insert`等，那么我们先定义一个基本标签：
 ```java
 /**
@@ -200,7 +200,7 @@ public interface IdDomElement extends DomElement {
 }
 ```
 
-### 动态查询语句元素
+#### 动态查询语句元素
 mapper中允许使用`where`，`set`，`if`等动态查询语句拼接查询条件，那么可以抽取出来一个动态查询语句元素：
 ```java
 /**
@@ -274,7 +274,7 @@ public interface Include extends DomElement {
 ```
 注意返回值泛型参数为`Sql`实体，这样在xml编写时，IDEA可以自动提供代码补全、鼠标点击跳转引用等功能。
 
-### 带有请求参数的元素
+#### 带有请求参数的元素
 增删改查元素都可以配置请求参数，包含`parameterType`指定一个实体类，那么我们抽取一个元素：
 ```java
 public interface ParameteredDynamicQueryableDomElement extends DynamicQueryableDomElement, IdDomElement {
@@ -287,7 +287,7 @@ public interface ParameteredDynamicQueryableDomElement extends DynamicQueryableD
 ```
 其中`parameterType`的返回值泛型类型为`PsiClass`，这样能映射到一个具体的实体类上。
 
-### 增删改查标签
+#### 增删改查标签
 有了`ParameteredDynamicQueryableDomElement`，就可以在此基础上继续丰富，定义增删改查标签。
 
 #### Insert
@@ -354,7 +354,6 @@ public interface ResultMapAttributeDomElement extends DomElement {
 #### resultMap
 
 `resultMap`元素有很多子元素和一个值得讨论的结构。
-resultMap
 * `constructor` - 用于在实例化类时，注入结果到构造方法中
   * `idArg` - ID 参数;标记出作为 ID 的结果可以帮助提高整体性能
   * `arg` - 将被注入到构造方法的一个普通结果
@@ -444,7 +443,7 @@ public interface Collection extends ResultMapBaseDomElement, ResultMapAttributeD
 }
 ```
 
-### 属性转换器PropertyConverter
+#### 属性转换器PropertyConverter
 重新把`property`属性请回来，因为我们要讲它的转换器：
 ```java
 /**
