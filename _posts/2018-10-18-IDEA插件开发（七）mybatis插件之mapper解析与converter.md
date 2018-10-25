@@ -1,5 +1,5 @@
 ---
-title: IDEA插件开发（七）mybatis插件之mapper解析
+title: IDEA插件开发（七）mybatis插件之mapper解析与converter
 date: 2018-10-18 17:41:50
 tags: idea
 categories: [idea,java]
@@ -444,6 +444,9 @@ public interface Collection extends ResultMapBaseDomElement, ResultMapAttributeD
 ```
 
 #### 属性转换器PropertyConverter
+
+> 注：属性转换器涉及到 __PSI Reference__ 的知识，在下一篇文章中做介绍。
+
 重新把`property`属性请回来，因为我们要讲它的转换器：
 ```java
 /**
