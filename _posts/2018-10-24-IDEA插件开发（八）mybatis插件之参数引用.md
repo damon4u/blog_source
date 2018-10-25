@@ -1,6 +1,6 @@
 ---
 title: IDEA插件开发（八）mybatis插件之参数引用
-date: 2018-10-25 17:41:50
+date: 2018-10-24 17:41:50
 tags: idea
 categories: [idea,java]
 ---
