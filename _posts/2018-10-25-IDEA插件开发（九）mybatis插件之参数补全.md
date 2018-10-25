@@ -76,7 +76,7 @@ abstract class BaseParamCompletionContributor extends CompletionContributor {
 ```
 该方法的逻辑比较清楚，先查出元素所在方法的参数列表，然后将参数构造成`LookupElement`返回。
 构造`LookupElement`时，需要设置参数名称，参数类型和图标。
-实现方式与上一篇IDEA插件开发（八）mybatis插件之参数引用类似，不多解释。
+实现方式与上一篇[IDEA插件开发（八）mybatis插件之参数引用](https://damon4u.github.io/blog/2018/10/IDEA%E6%8F%92%E4%BB%B6%E5%BC%80%E5%8F%91%EF%BC%88%E5%85%AB%EF%BC%89mybatis%E6%8F%92%E4%BB%B6%E4%B9%8B%E5%8F%82%E6%95%B0%E5%BC%95%E7%94%A8.html) 类似，不多解释。
 
 主要看两个具体的实现类。
 
