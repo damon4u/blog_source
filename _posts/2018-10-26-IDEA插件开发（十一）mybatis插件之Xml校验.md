@@ -119,3 +119,7 @@ public class MapperXmlInspection extends BasicDomElementsInspection<DomElement> 
 
 打开setting提示：
 ![](/images/idea-plugin19.png)
+
+参考：
+[Code Inspections](https://www.jetbrains.org/intellij/sdk/docs/tutorials/code_inspections.html)
+[Code Inspection](https://www.jetbrains.com/help/idea/code-inspection.html)
