@@ -74,7 +74,7 @@ public class SimplePojo implements Pojo {
 
 或者在一个bean里面，从Spring容器中手动获取bean进行调用：
 ```java
-@Service("simplePojo")
+@Component("simplePojo")
 public class SimplePojo implements Pojo {
 
     public void foo() {
@@ -85,11 +85,57 @@ public class SimplePojo implements Pojo {
     public void bar() {
         // some logic...
     }
+
+    public SimplePojo getService() {
+        return (SimplePojo) SpringContextUtil.getBean("simplePojo");
+    }
 }
-public PKService getService() {
-    return (SimplePojo) SpringContextUtil.getBean("simplePojo");
+
+/**
+* 保存Spring上下文
+*/
+public class SpringContextUtil implements ApplicationContextAware {
+    private static ApplicationContext applicationContext;
+
+    public SpringContextUtil() {
+    }
+
+    public void setApplicationContext(ApplicationContext applicationContext) throws BeansException {
+        applicationContext = applicationContext;
+    }
+
+    /**
+    * 根据bean名称获取bean
+    */
+    public static Object getBean(String name) throws BeansException {
+        return applicationContext.getBean(name);
+    }
 }
 ```
+
+还有一种方法是在bean中引入自己：
+```java
+@Component("simplePojo")
+public class SimplePojo implements Pojo {
+
+    @Resource
+    private SimplePojo simplePojo;
+
+    public void foo() {
+        // this works, but... gah!
+        simplePojo.bar();
+    }
+
+    public void bar() {
+        // some logic...
+    }
+
+    public SimplePojo getService() {
+        return (SimplePojo) SpringContextUtil.getBean("simplePojo");
+    }
+}
+```
+但是这种方式容易产生循环依赖，没有使用。
 
 还有一种方法，是使用AspectJ的AOP代替Spring AOP的代理方式。在编译器进行代码织入。但是自己用的比较少，这里不做介绍了。
 
