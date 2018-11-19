@@ -81,7 +81,7 @@ logback.xml配置基本一样：
 <appender name="REQUEST_LOG" class="ch.qos.logback.core.rolling.RollingFileAppender">
 		<File>${catalina.base}/logs/request-json.log</File>
 		<encoder charset="UTF-8" class="net.logstash.logback.encoder.LogstashEncoder">
-				<jsonFactoryDecorator class="com.netease.mint.common.core.util.NoEscapingJsonFactoryDecorator"/>
+				<jsonFactoryDecorator class="com.package.NoEscapingJsonFactoryDecorator"/>
 		</encoder>
 		<rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
 				<fileNamePattern>${catalina.base}/logs/request-json.log.%d{yyyy-MM-dd}</fileNamePattern>
@@ -95,7 +95,7 @@ logback.xml配置基本一样：
 		<includeCallerData>true</includeCallerData>
 </appender>
 
-<logger name="mint_request" level="INFO" additivity="false">
+<logger name="requestLog" level="INFO" additivity="false">
 		<appender-ref ref="REQUEST_LOG"/>
 </logger>
 ```
@@ -160,12 +160,12 @@ logger.info(appendFields(myobject), "log message");
 ```java
 private static final Logger LOGGER = LoggerFactory.getLogger("requestLog");
 LOGGER.info(append("requestMethod", request.getMethod())
-								.and(append("requestURI", request.getRequestURI()))
-								.and(append("queryString", request.getQueryString())
-								.and(append("responseStatus", response.getStatus()))
-								.and(append("responseStatusReason", HttpStatus.valueOf(status).getReasonPhrase()))
-								.and(append("responseContent", logContent))
-								.and(append("costTime(ms)", System.currentTimeMillis() - startTime))
+			.and(append("requestURI", request.getRequestURI()))
+			.and(append("queryString", request.getQueryString())
+			.and(append("responseStatus", response.getStatus()))
+			.and(append("responseStatusReason", HttpStatus.valueOf(status).getReasonPhrase()))
+			.and(append("responseContent", logContent))
+			.and(append("costTime(ms)", System.currentTimeMillis() - startTime))
 				, "log message");
 ```
 这样打印的结果(手动格式化了)如下：
