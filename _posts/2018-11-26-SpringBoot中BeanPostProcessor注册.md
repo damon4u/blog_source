@@ -1,5 +1,5 @@
 ---
-title: SpringBoot中BeanFactoryPostProcessor注册
+title: SpringBoot中BeanPostProcessor注册
 date: 2018-11-26 16:41:50
 tags: spring
 categories: spring
@@ -24,7 +24,7 @@ public class SpringServiceConfig {
     //sessionManager securityManager realm...
 
     @Bean
-    public static LifecycleBeanPostProcessor lifecycleBeanPostProcessor() {
+    public LifecycleBeanPostProcessor lifecycleBeanPostProcessor() {
         return new LifecycleBeanPostProcessor();
     }
 
@@ -70,19 +70,24 @@ No default constructor found;
 因此，如果一个`@Configuration`标注的类中返回了`BeanPostProcessor`或者`BeanFactoryPostProcessor`，那么无法使用`@Autowired`进行注入。
 `@Bean`注解的javadoc中也有说明：
 > BeanFactoryPostProcessor-returning `@Bean` methods <br>
-Special consideration must be taken for `@Bean` methods that return Spring __BeanFactoryPostProcessor (BFPP)__ types. Because BFPP objects must be instantiated very early in the container lifecycle, they can interfere(干涉) with processing of annotations such as `@Autowired`, `@Value`, and `@PostConstruct` within `@Configuration` classes. To avoid these lifecycle issues, mark BFPP-returning `@Bean` methods as __static__. For example:<br>
-```
+Special consideration must be taken for `@Bean` methods that return Spring __BeanFactoryPostProcessor (BFPP)__ types. Because BFPP objects must be instantiated very early in the container lifecycle, they can interfere(干涉) with processing of annotations such as `@Autowired`, `@Value`, and `@PostConstruct` within `@Configuration` classes. To avoid these lifecycle issues, mark BFPP-returning `@Bean` methods as __static__. For example:
+```java
        @Bean
        public static PropertyPlaceholderConfigurer ppc() {
            // instantiate, configure and return ppc ...
        }
 ```
-<br>
-By marking this method as static, it can be invoked without causing instantiation of its declaring `@Configuration` class, thus avoiding the above-mentioned lifecycle conflicts. Note however that static `@Bean` methods will not be enhanced for scoping and AOP semantics as mentioned above. This works out in BFPP cases, as they are not typically referenced by other `@Bean` methods. As a reminder, a WARN-level log message will be issued for any non-static `@Bean` methods having a return type assignable to BeanFactoryPostProcessor.
+> By marking this method as static, it can be invoked without causing instantiation of its declaring `@Configuration` class, thus avoiding the above-mentioned lifecycle conflicts. Note however that static `@Bean` methods will not be enhanced for scoping and AOP semantics as mentioned above. This works out in BFPP cases, as they are not typically referenced by other `@Bean` methods. As a reminder, a WARN-level log message will be issued for any non-static `@Bean` methods having a return type assignable to BeanFactoryPostProcessor.
 
 解决的方案javadoc中也说了，就是给返回`BeanPostProcessor`或者`BeanFactoryPostProcessor`的方法使用static修饰。
 这样，调用该方法时，不需要实例化外层的容器。
 
+```java
+@Bean
+public static LifecycleBeanPostProcessor lifecycleBeanPostProcessor() {
+    return new LifecycleBeanPostProcessor();
+}
+```
 
 
 参考：
