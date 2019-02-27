@@ -58,3 +58,5 @@ For any such bean, you should see an info log message: “Bean 'foo' is not elig
 
 参考：
 [Tracking down cause of Spring's “not eligible for auto-proxying”](https://stackoverflow.com/questions/1201726/tracking-down-cause-of-springs-not-eligible-for-auto-proxying)
+
+[BeanPostProcessor加载次序及其对Bean造成的影响分析](https://blog.csdn.net/m0_37962779/article/details/78605478)
